@@ -1,0 +1,223 @@
+Launch Ubuntu 20.0. We will install prometheus on it.
+
+Connect your machine via SSH.
+
+Now follow below commands.
+
+sudo apt-get update -y
+(Update your EC2 machine)
+
+sudo apt install Prometheus -y
+(From this command both Prometheus & node-exporter will install in your system)
+
+prometheus --version
+(To check prometheus version installed)
+
+
+systemctl status prometheus
+
+systemctl status prometheus-node-exporter
+
+Access Prometheus on 9090 port with public IP:9090
+
+
+node_filesystem_avail_bytes{device="/dev/root",fstype="ext4",instance="localhost:9100",job="node",mountpoint="/"} / 1024^3
+
+
+
+Now install grafana with following commands or you can follow official documentation link for the same. 
+(https://grafana.com/docs/grafana/latest/setup-grafana/installation/debian/)
+sudo apt-get install -y apt-transport-https
+sudo apt-get install -y software-properties-common wget
+sudo wget -q -O /usr/share/keyrings/grafana.key https://apt.grafana.com/gpg.key
+echo "deb [signed-by=/usr/share/keyrings/grafana.key] https://apt.grafana.com stable main" | sudo tee -a /etc/apt/sources.list.d/grafana.list
+sudo apt-get update	
+sudo apt-get install grafana
+
+
+grafana-server --version
+(To check grafana version)
+
+If you want to check grafana previous versions then follow below document link.
+
+https://grafana.com/grafana/download/10.2.3?edition=oss
+
+
+
+We always prefer to open source grafana version but if you want to know when to use enterprise grade then you can refer grafana blog.
+
+https://grafana.com/blog/2019/09/04/how-we-differentiate-grafana-enterprise-from-open-source-grafana/
+
+
+We have install grafana. Now we need to start it. In order to access.
+
+sudo systemctl start grafana-server
+(From above command grafana will start)
+
+sudo systemctl start grafana-server
+(To check grafana current status)
+
+
+
+Grafana runs on port 3000 and we can check it with below command
+
+sudo apt install net-tools
+(To install net tools)
+
+netstat -ntlp
+(We can see 3000 port is up and running)
+
+Now if we want to access grafana from web, we have to open 3000 port in security group.
+
+Access gafana from UI with public IP and port number 3000
+
+When you access Grafana first time login with username & password as admin
+First we need to add data source in grafana so click on Data Source and select Prometheus as Data Source.
+Select Prometheus as Data source and its IP EC2 machine Public IP with port 9090.
+
+Click on Save & Test. 
+
+Now to Create Dashboard goto Dashboard section. 
+New > Import > enter 11074 (You can any dashboard ID) > Click on Load
+     Next Page Select your Saved data source (Prometheus) and Click on Import 
+    You can see Dashboard is Import & its visualization as per your Dashboard ID you give.
+
+
+
+☸️ Role Based Access in Grafana :-
+
+how we can add users in Grafana
+
+Goto Administration > Users and Access > User > New User
+
+Enter name , Email , Username & Password
+
+Now take one new incognito tab and login with that new user.
+
+
+Alert Rule Set 
+To Set Alert select any Graph and click on Edit.( We will take Disk Space Used % Basic graph)
+Once you click on Edit you will go inside that particular graph & you can see Alert tab there. Click on that then Create New Alert Rule .
+
+Click On Run Queries and make sure graph is reflected in alert page. If not you can delete if it has multiple Queries.
+After Graph is showing set your thresholds parameters.
+
+C= Reduce , Input = A , Function = Last , Mode = Strict
+D=Threshold, Input = c , Function = Above = 20
+
+Click on Preview where alert is fired or not based on number you select in Above fields. 
+
+Set Interval time and evaluation time as 1 minute. Create Folder and Evaluation Group.
+Click on Save rule and exit
+
+SMTP in Grafana 
+To set SMPT in grafana you need to create App password from Gmail. Kindly follow Gmail app password setup documents for details.
+
+Once you have app password then goto your terminal and follow below steps.
+You need to set SMTP in grafana configuration file to send Alert on Gmail.
+cd /etc/grafana
+ls
+you can see gafana.ini file is here so we need to edit that with below command
+sudo vi grafana.ini
+Now goto SMTP section and edit following information
+enabled = true
+ host = smtp.gmail.com:587
+user = yourid@gmail.com
+password = <enter your 10 digit gmail app password>
+Save and close 
+Restart grafana with below command
+systemctl restart grafana-server
+
+We have configure SMTP in grafana now access grafana from UI
+
+
+  Click 3 row line at left side cornor > Alerting > Contact Points 
+Click on Edit of grafana-default-email
+
+   We can see there is one default contact point is present click on edit symbol below Action name
+Name and Integration would be Email
+Addressess. Mention your own gmail on which you want alert > click on Test
+Check your Gmail inbox whether you receive test alert or not.
+Once you receive test alert then goto Grafana UI and Click Save Contact Point
+ Now follow Alert Rule Set section as explain above & set threshould on which your alert will fire and check if you receive alert in 1-2 minutes in your Gmail Inbox.
+
+
+☸️ Steps to add new EC2 Instance in Prometheus :-
+
+Launch new ubuntu 20.0 with node_2 and give security group with same name node_2 security Group and connect it with ssh
+
+sudo apt-get update -y
+
+➡️From below one by one command install only node exporter in it.
+
+wget https://github.com/prometheus/node_exporter/releases/download/v1.6.1/node_exporter-1.6.1.linux-amd64.tar.gz
+tar xvfz node_exporter-1.6.1.linux-amd64.tar.gz
+cd node_exporter-1.6.1.linux-amd64
+sudo mv node_exporter /usr/local/bin/
+
+➡️ Now create one node exporter.service with below command.
+
+sudo vi /etc/systemd/system/node_exporter.service
+(After file is created. Copy paste below content and save it )
+
+
+
+
+[Unit]
+Description=Node Exporter
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+User=ubuntu
+ExecStart=/usr/local/bin/node_exporter --web.listen-address=:12345
+
+[Install]
+WantedBy=default.target
+
+---------------------------Start Node exporter service----------------------------------------------
+
+sudo systemctl daemon-reload
+sudo systemctl start node_exporter
+sudo systemctl enable node_exporter
+sudo systemctl status node_exporter
+
+----------------------------------------------------------------------------------
+
+Now Take Public IP of prometheus server and in Node_2 server security group, allow 9100 to access it.
+
+Edit Inbound rules >  type = custom TCP > port = 9100 > source = Custom <EnterPrometheuspublicIP> 
+Save it
+
+Now Goto Prometheus Server Terminal.
+
+cd /etc/prometheus
+
+sudo vi prometheus.yaml
+
+At the end add below content
+
+  - job_name: node_2
+    # If prometheus-node-exporter is installed, grab stats about the local
+    # machine by default.
+    static_configs:
+      - targets: ['<node2publicIP>:9100']
+  
+
+Goto grafana server terminal and restart grafana service
+
+sudo systemctl restart grafana-server
+
+Now Finally access to Grafana Dashboard. In Dashboard we have tab to select instance
+Origin_prom = None , JOB = node , Host = all
+
+In that JOB field select node_2 in job drop down and you will get details of node_2 server.
+
+ 
+
+
+
+
+
+
+
